@@ -1,11 +1,9 @@
---top 5 cities each month by revenue in 2008
-
 with ranked as (
 
     select
         v.venuecity as city,
         d.month,
-  		  date_part(month, d.caldate) as month_num, --included only to order by chronologically in main select
+  		date_part(month, d.caldate) as month_num, --included only to order by chronologically
         sum(s.pricepaid) as revenue,
         rank() over (partition by month order by sum(s.pricepaid) desc) as rnk
 
@@ -18,7 +16,7 @@ with ranked as (
 )
 
 select
-	  city,
+	city,
     month,
     revenue
     
