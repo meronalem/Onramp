@@ -1,11 +1,11 @@
 with ranked as (
 
     select
-        v.venuecity as city,
-        d.month,
-  		date_part(month, d.caldate) as month_num, --included only to order by chronologically
-        sum(s.pricepaid) as revenue,
-        rank() over (partition by month order by sum(s.pricepaid) desc) as rnk
+	v.venuecity as city,
+	d.month,
+	date_part(month, d.caldate) as month_num, --included only to order by chronologically
+	sum(s.pricepaid) as revenue,
+	rank() over (partition by month order by sum(s.pricepaid) desc) as rnk
 
     from sales as s
     join date as d on s.dateid = d.dateid
@@ -16,7 +16,7 @@ with ranked as (
 )
 
 select
-	city,
+    city,
     month,
     revenue
     
