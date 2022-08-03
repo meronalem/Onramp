@@ -1,3 +1,5 @@
+--top 5 cities each month by revenue in 2008
+
 with ranked as (
 
     select
