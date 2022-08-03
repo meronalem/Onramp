@@ -1,0 +1,27 @@
+--top 5 cities each month by revenue in 2008
+
+with ranked as (
+
+    select
+        v.venuecity as city,
+        d.month,
+  		  date_part(month, d.caldate) as month_num, --included only to order by chronologically in main select
+        sum(s.pricepaid) as revenue,
+        rank() over (partition by month order by sum(s.pricepaid) desc) as rnk
+
+    from sales as s
+    join date as d on s.dateid = d.dateid
+    join event as e on s.eventid = e.eventid
+    join venue as v on e.venueid = v.venueid
+    where d.year = 2008
+    group by 1, 2, 3
+)
+
+select
+	  city,
+    month,
+    revenue
+    
+from ranked
+where rnk <= 5
+order by month_num, rnk
