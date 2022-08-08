@@ -1,0 +1,126 @@
+with
+
+event_sales_agg as (
+ 
+  select
+  	s.eventid,
+  	d.month,
+  	date_part(month, d.caldate) as month_num,
+  	sum(s.pricepaid * s.qtysold) as sales
+  
+  from sales as s
+    join date as d on s.dateid = d.dateid
+  group by 1, 2, 3
+  ),
+
+base as (
+  
+  select
+  	a.eventid,
+  	e.eventname as event,
+  	a.sales,
+  	a.month_num,
+  	a.month,
+  	e.venueid,
+  	coalesce(v.venuename, concat('Unknown_Venue_', e.venueid)) as venue,
+  	e.catid,
+  	c.catname as category
+  
+  from event_sales_agg as a
+    join event as e on a.eventid = e.eventid
+    left join venue as v on e.venueid = v.venueid
+    join category as c on e.catid = c.catid
+  ),
+
+event1 as (
+  
+  select
+  	month_num,
+  	catid,
+  	venueid,
+  	eventid,
+  	sum(sales) as sales,
+  	rank() over (partition by month_num, catid, venueid order by sum(sales) desc) as event_rank
+  
+  from base
+  group by 1, 2, 3, 4
+  ),
+
+event2 as (
+  
+  select *, sum(sales) over (partition by eventid order by month_num rows between unbounded preceding and current row) as e_rt
+  from event1
+  ),
+
+venue1 as (
+  
+  select
+  	month_num,
+  	catid,
+  	venueid,
+  	sum(sales) as sales,
+  	rank() over (partition by month_num, catid order by sum(sales) desc) as venue_rank
+  
+  from base
+  group by 1, 2, 3
+  ),
+  
+venue2 as (
+  
+  select *, sum(sales) over (partition by venueid order by month_num rows between unbounded preceding and current row) as v_rt
+  from venue1
+  ),
+  
+category1 as (
+  
+  select
+  	month_num,
+  	catid,
+  	sum(sales) as sales,
+  	rank() over (partition by month_num order by sum(sales) desc) as category_rank
+  
+  from base
+  group by 1, 2
+  ),
+  
+category2 as (
+  
+  select *, sum(sales) over (partition by catid order by month_num rows between unbounded preceding and current row) as c_rt
+  from category1
+  ),
+  
+category3 as (
+  
+  select
+  	month_num, 
+  	catid, 
+  	c_rt, 
+  	lag(c_rt) over (partition by month_num order by category_rank) as lag  
+  from category2
+  )
+  
+select
+  initcap(b.month) as month,
+  b.category,
+  c2.category_rank,
+  b.venue,
+  v2.venue_rank,
+  b.eventid as event_id,
+  b.event,
+  e2.event_rank,
+  b.sales,
+  e2.e_rt as event_sales_rt,
+  v2.v_rt as venue_sales_rt,
+  c2.c_rt as category_sales_rt,
+  (c3.c_rt-c3.lag)/c3.lag * 100  as percent_change_category 
+  
+from base as b
+  join category2 as c2
+    on b.month_num = c2.month_num and b.catid = c2.catid
+  left join category3 as c3
+    on b.month_num = c3.month_num and b.catid = c3.catid
+  join venue2 as v2
+    on b.month_num = v2.month_num and b.catid = v2.catid and b.venueid = v2.venueid
+  join event2 as e2
+    on b.month_num = e2.month_num and b.catid = e2.catid and b.venueid = e2.venueid and b.eventid = e2.eventid
+order by b.month_num, c2.category_rank, v2.venue_rank, e2.event_rank
